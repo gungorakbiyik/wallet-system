@@ -8,4 +8,6 @@ import java.util.List;
 public interface EventStoreRepository {
     void save(DomainEvent event);
     List<DomainEvent> getEventsForWallet(WalletId walletId);
+
+    void saveAll(List<DomainEvent> domainEvents);
 }
