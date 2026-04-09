@@ -70,6 +70,21 @@ public class Wallet {
                         e.getReferenceId()
                 ));
             }
+            case TransferReceived e -> {
+                this.balance = this.balance.add(e.getAmount());
+                this.transactions.add(Transaction.create(
+                        TransactionType.TRANSFER_IN,
+                        e.getAmount(),
+                        e.getReferenceId()
+                ));
+            }
+            case WalletBlocked e -> {
+                this.status = WalletStatus.BLOCKED;
+
+            }
+            case WalletUnblocked e -> {
+                this.status = WalletStatus.ACTIVE;
+            }
             default -> {
                 throw new IllegalStateException("Unhandled event: " + event);
             }
@@ -128,6 +143,42 @@ public class Wallet {
         apply(event);
     }
 
+    public void receiveTransfer(Money transferAmount,
+                                WalletId sourceWalletId,
+                                ReferenceId referenceId) {
+        requireWalletActive();
+        requirePositiveAmount(transferAmount);
+        requireNoDuplicate(referenceId);
+
+        TransferReceived event = new TransferReceived(
+                sourceWalletId,
+                this.walletId,
+                transferAmount,
+                referenceId
+        );
+        apply(event);
+    }
+
+    public void block(String reason) {
+        requireWalletActive();
+
+        WalletBlocked event = new WalletBlocked(
+                this.walletId,
+                reason
+        );
+        apply(event);
+    }
+
+    public void unblock(String reason) {
+        requireWalletBlocked();
+
+        WalletUnblocked event = new WalletUnblocked(
+                this.walletId,
+                reason
+        );
+        apply(event);
+    }
+
     private void requireSufficientBalance(Money withdrawAmount) {
         if (this.balance.isLessThan(withdrawAmount)) {
             throw new IllegalArgumentException("Insufficient balance");
@@ -151,6 +202,12 @@ public class Wallet {
     private void requireWalletActive() {
         if (status != WalletStatus.ACTIVE) {
             throw new IllegalStateException("Wallet is not active");
+        }
+    }
+
+    private void requireWalletBlocked() {
+        if (status != WalletStatus.BLOCKED) {
+            throw new IllegalStateException("Wallet is not blocked");
         }
     }
 
