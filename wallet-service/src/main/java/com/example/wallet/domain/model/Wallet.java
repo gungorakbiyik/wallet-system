@@ -1,8 +1,6 @@
 package com.example.wallet.domain.model;
 
-import com.example.wallet.domain.event.DomainEvent;
-import com.example.wallet.domain.event.MoneyDeposited;
-import com.example.wallet.domain.event.WalletCreated;
+import com.example.wallet.domain.event.*;
 import com.example.wallet.domain.vo.*;
 
 import java.util.ArrayList;
@@ -56,10 +54,30 @@ public class Wallet {
                         e.getReferenceId()
                 ));
             }
+            case MoneyWithdrawn e -> {
+                this.balance = this.balance.subtract(e.getAmount());
+                this.transactions.add(Transaction.create(
+                        TransactionType.WITHDRAWAL,
+                        e.getAmount(),
+                        e.getReferenceId()
+                ));
+            }
+            case TransferInitiated e -> {
+                this.balance = this.balance.subtract(e.getAmount());
+                this.transactions.add(Transaction.create(
+                        TransactionType.TRANSFER_OUT,
+                        e.getAmount(),
+                        e.getReferenceId()
+                ));
+            }
             default -> {
                 throw new IllegalStateException("Unhandled event: " + event);
             }
         }
+    }
+
+    public void rehydrate(List<DomainEvent> events) {
+        events.forEach(this::onEvent);
     }
 
     public void deposit(Money depositAmount, ReferenceId referenceId) {
@@ -80,6 +98,42 @@ public class Wallet {
 
     }
 
+    public void withdraw(Money withdrawAmount, ReferenceId referenceId) {
+        requireWalletActive();
+        requirePositiveAmount(withdrawAmount);
+        requireNoDuplicate(referenceId);
+        requireSufficientBalance(withdrawAmount);
+        MoneyWithdrawn event = new MoneyWithdrawn(
+                this.walletId,
+                withdrawAmount,
+                referenceId
+        );
+        apply(event);
+    }
+
+    public void initiateTransfer(Money transferAmount,
+                                 WalletId targetWalletId,
+                                 ReferenceId referenceId) {
+        requireWalletActive();
+        requirePositiveAmount(transferAmount);
+        requireNoDuplicate(referenceId);
+        requireSufficientBalance(transferAmount);
+
+        TransferInitiated event = new TransferInitiated(
+                this.walletId,
+                targetWalletId,
+                transferAmount,
+                referenceId
+        );
+        apply(event);
+    }
+
+    private void requireSufficientBalance(Money withdrawAmount) {
+        if (this.balance.isLessThan(withdrawAmount)) {
+            throw new IllegalArgumentException("Insufficient balance");
+        }
+    }
+
     private void requireNoDuplicate(ReferenceId referenceId) {
         boolean exists = this.transactions.stream()
                 .anyMatch(t -> t.getReferenceId().equals(referenceId));
@@ -98,5 +152,29 @@ public class Wallet {
         if (status != WalletStatus.ACTIVE) {
             throw new IllegalStateException("Wallet is not active");
         }
+    }
+
+    public void clearDomainEvents() {
+        domainEvents.clear();
+    }
+
+    public WalletId getWalletId() {
+        return walletId;
+    }
+
+    public AccountId getAccountId() {
+        return accountId;
+    }
+
+    public Money getBalance() {
+        return balance;
+    }
+
+    public WalletStatus getStatus() {
+        return status;
+    }
+
+    public List<DomainEvent> getDomainEvents() {
+        return domainEvents;
     }
 }
