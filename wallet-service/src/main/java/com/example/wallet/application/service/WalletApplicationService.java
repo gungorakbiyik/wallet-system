@@ -1,28 +1,27 @@
 package com.example.wallet.application.service;
 
+import com.example.wallet.domain.event.DomainEvent;
 import com.example.wallet.domain.exception.WalletNotFoundException;
 import com.example.wallet.domain.model.Wallet;
 import com.example.wallet.domain.port.in.*;
-import com.example.wallet.domain.port.out.EventStoreRepository;
 import com.example.wallet.domain.port.out.WalletRepository;
 import com.example.wallet.domain.vo.Money;
 import com.example.wallet.domain.vo.ReferenceId;
 import com.example.wallet.domain.vo.WalletId;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
 
+@Service
 @Transactional
 public class WalletApplicationService implements DepositMoneyUseCase, WithdrawMoneyUseCase,
         TransferMoneyUseCase, BlockWalletUseCase, UnblockWalletUseCase {
 
     private final WalletRepository walletRepository;
-    private final EventStoreRepository eventStoreRepository;
 
-    public WalletApplicationService(WalletRepository walletRepository,
-                                    EventStoreRepository eventStoreRepository) {
+    public WalletApplicationService(WalletRepository walletRepository) {
         this.walletRepository = walletRepository;
-        this.eventStoreRepository = eventStoreRepository;
     }
 
     @Override
@@ -30,7 +29,6 @@ public class WalletApplicationService implements DepositMoneyUseCase, WithdrawMo
         Wallet wallet = findWallet(walletId);
         wallet.deposit(amount, referenceId);
         walletRepository.save(wallet);
-        eventStoreRepository.saveAll(wallet.getDomainEvents());
         wallet.clearDomainEvents();
         return wallet.getBalance();
     }
@@ -40,7 +38,6 @@ public class WalletApplicationService implements DepositMoneyUseCase, WithdrawMo
         Wallet wallet = findWallet(walletId);
         wallet.withdraw(amount, referenceId);
         walletRepository.save(wallet);
-        eventStoreRepository.saveAll(wallet.getDomainEvents());
         wallet.clearDomainEvents();
         return wallet.getBalance();
     }
@@ -57,8 +54,6 @@ public class WalletApplicationService implements DepositMoneyUseCase, WithdrawMo
         targetWallet.receiveTransfer(amount, sourceWalletId, referenceId);
         walletRepository.save(sourceWallet);
         walletRepository.save(targetWallet);
-        eventStoreRepository.saveAll(sourceWallet.getDomainEvents());
-        eventStoreRepository.saveAll(targetWallet.getDomainEvents());
         sourceWallet.clearDomainEvents();
         targetWallet.clearDomainEvents();
         return sourceWallet.getBalance();
@@ -69,7 +64,6 @@ public class WalletApplicationService implements DepositMoneyUseCase, WithdrawMo
         Wallet wallet = findWallet(walletId);
         wallet.block(reason);
         walletRepository.save(wallet);
-        eventStoreRepository.saveAll(wallet.getDomainEvents());
         wallet.clearDomainEvents();
     }
 
@@ -78,13 +72,13 @@ public class WalletApplicationService implements DepositMoneyUseCase, WithdrawMo
         Wallet wallet = findWallet(walletId);
         wallet.unblock(reason);
         walletRepository.save(wallet);
-        eventStoreRepository.saveAll(wallet.getDomainEvents());
         wallet.clearDomainEvents();
     }
 
     private Wallet findWallet(WalletId walletId) {
-        return walletRepository.findById(walletId)
+        Wallet wallet = walletRepository.findById(walletId)
                 .orElseThrow(WalletNotFoundException::new);
+        return wallet;
     }
 
 }

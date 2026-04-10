@@ -24,75 +24,27 @@ public class Wallet {
     // -----------------------------------------------------------------
     public static Wallet create(AccountId accountId, Currency currency) {
         var wallet = new Wallet();
+
+        wallet.walletId = WalletId.generate();
+        wallet.accountId = accountId;
+        wallet.balance = Money.zero(currency);
+        wallet.status = WalletStatus.ACTIVE;
         var event = new WalletCreated(
-                WalletId.generate(),
-                accountId,
-                currency
+                wallet.walletId,
+                wallet.accountId,
+                wallet.balance.getCurrency()
         );
-        wallet.apply(event);
+        wallet.domainEvents.add(event);
         return wallet;
     }
 
-    private void apply(DomainEvent event) {
-        domainEvents.add(event);
-        onEvent(event);
-    }
-
-    private void onEvent(DomainEvent event) {
-        switch (event) {
-            case WalletCreated e -> {
-                this.walletId = e.getWalletId();
-                this.accountId = e.getAccountId();
-                this.balance = Money.zero(e.getCurrency());
-                this.status = WalletStatus.ACTIVE;
-            }
-            case MoneyDeposited e -> {
-                this.balance = this.balance.add(e.getAmount());
-                this.transactions.add(Transaction.create(
-                        TransactionType.DEPOSIT,
-                        e.getAmount(),
-                        e.getReferenceId()
-                ));
-            }
-            case MoneyWithdrawn e -> {
-                this.balance = this.balance.subtract(e.getAmount());
-                this.transactions.add(Transaction.create(
-                        TransactionType.WITHDRAWAL,
-                        e.getAmount(),
-                        e.getReferenceId()
-                ));
-            }
-            case TransferInitiated e -> {
-                this.balance = this.balance.subtract(e.getAmount());
-                this.transactions.add(Transaction.create(
-                        TransactionType.TRANSFER_OUT,
-                        e.getAmount(),
-                        e.getReferenceId()
-                ));
-            }
-            case TransferReceived e -> {
-                this.balance = this.balance.add(e.getAmount());
-                this.transactions.add(Transaction.create(
-                        TransactionType.TRANSFER_IN,
-                        e.getAmount(),
-                        e.getReferenceId()
-                ));
-            }
-            case WalletBlocked e -> {
-                this.status = WalletStatus.BLOCKED;
-
-            }
-            case WalletUnblocked e -> {
-                this.status = WalletStatus.ACTIVE;
-            }
-            default -> {
-                throw new IllegalStateException("Unhandled event: " + event);
-            }
-        }
-    }
-
-    public void rehydrate(List<DomainEvent> events) {
-        events.forEach(this::onEvent);
+    static Wallet initialize(WalletId walletId, AccountId accountId, Money balance, WalletStatus status) {
+        Wallet wallet = new Wallet();
+        wallet.walletId = walletId;
+        wallet.accountId = accountId;
+        wallet.balance = balance;
+        wallet.status = status;
+        return wallet;
     }
 
     public void deposit(Money depositAmount, ReferenceId referenceId) {
@@ -103,13 +55,14 @@ public class Wallet {
         // aynı reference id daha önce kullanılmış mı?
         requireNoDuplicate(referenceId);
 
+        this.balance = this.balance.add(depositAmount);
         // MoneyDeposited
         MoneyDeposited event = new MoneyDeposited(
                 this.walletId,
                 depositAmount,
                 referenceId
         );
-        apply(event);
+        domainEvents.add(event);
 
     }
 
@@ -118,12 +71,14 @@ public class Wallet {
         requirePositiveAmount(withdrawAmount);
         requireNoDuplicate(referenceId);
         requireSufficientBalance(withdrawAmount);
+
+        this.balance = this.balance.subtract(withdrawAmount);
         MoneyWithdrawn event = new MoneyWithdrawn(
                 this.walletId,
                 withdrawAmount,
                 referenceId
         );
-        apply(event);
+        domainEvents.add(event);
     }
 
     public void initiateTransfer(Money transferAmount,
@@ -134,13 +89,14 @@ public class Wallet {
         requireNoDuplicate(referenceId);
         requireSufficientBalance(transferAmount);
 
+        this.balance = this.balance.subtract(transferAmount);
         TransferInitiated event = new TransferInitiated(
                 this.walletId,
                 targetWalletId,
                 transferAmount,
                 referenceId
         );
-        apply(event);
+        domainEvents.add(event);
     }
 
     public void receiveTransfer(Money transferAmount,
@@ -150,33 +106,36 @@ public class Wallet {
         requirePositiveAmount(transferAmount);
         requireNoDuplicate(referenceId);
 
+        this.balance = this.balance.add(transferAmount);
         TransferReceived event = new TransferReceived(
                 sourceWalletId,
                 this.walletId,
                 transferAmount,
                 referenceId
         );
-        apply(event);
+        domainEvents.add(event);
     }
 
     public void block(String reason) {
         requireWalletActive();
 
+        this.status = WalletStatus.BLOCKED;
         WalletBlocked event = new WalletBlocked(
                 this.walletId,
                 reason
         );
-        apply(event);
+        domainEvents.add(event);
     }
 
     public void unblock(String reason) {
         requireWalletBlocked();
 
+        this.status = WalletStatus.ACTIVE;
         WalletUnblocked event = new WalletUnblocked(
                 this.walletId,
                 reason
         );
-        apply(event);
+        domainEvents.add(event);
     }
 
     private void requireSufficientBalance(Money withdrawAmount) {
