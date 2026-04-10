@@ -5,9 +5,7 @@ import com.example.wallet.domain.exception.WalletNotFoundException;
 import com.example.wallet.domain.model.Wallet;
 import com.example.wallet.domain.port.in.*;
 import com.example.wallet.domain.port.out.WalletRepository;
-import com.example.wallet.domain.vo.Money;
-import com.example.wallet.domain.vo.ReferenceId;
-import com.example.wallet.domain.vo.WalletId;
+import com.example.wallet.domain.vo.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,12 +14,20 @@ import java.util.List;
 @Service
 @Transactional
 public class WalletApplicationService implements DepositMoneyUseCase, WithdrawMoneyUseCase,
-        TransferMoneyUseCase, BlockWalletUseCase, UnblockWalletUseCase {
+        TransferMoneyUseCase, BlockWalletUseCase, UnblockWalletUseCase, CreateWalletUseCase {
 
     private final WalletRepository walletRepository;
 
     public WalletApplicationService(WalletRepository walletRepository) {
         this.walletRepository = walletRepository;
+    }
+
+    @Override
+    public WalletId create(AccountId accountId, Currency currency) {
+        Wallet wallet = Wallet.create(accountId, currency);
+        walletRepository.save(wallet);
+        wallet.clearDomainEvents();
+        return wallet.getWalletId();
     }
 
     @Override

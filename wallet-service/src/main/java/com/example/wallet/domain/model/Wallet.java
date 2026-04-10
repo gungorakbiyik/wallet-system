@@ -24,6 +24,15 @@ public class Wallet {
     // ve rehydration (aşağıda)
     // -----------------------------------------------------------------
     public static Wallet create(AccountId accountId, Currency currency) {
+
+        if (accountId == null) {
+            throw new IllegalArgumentException("accountId cannot be null");
+        }
+
+        if (currency == null) {
+            throw new IllegalArgumentException("currency cannot be null");
+        }
+
         var wallet = new Wallet();
 
         wallet.walletId = WalletId.generate();
