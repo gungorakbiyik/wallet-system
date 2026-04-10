@@ -12,6 +12,7 @@ public class Wallet {
     private AccountId accountId;
     private Money balance;
     private WalletStatus status;
+    private Long version;
     private final List<Transaction> transactions = new ArrayList<>();
 
     // Dışarıya publish edilmeyi bekleyen domain event'leri
@@ -38,12 +39,18 @@ public class Wallet {
         return wallet;
     }
 
-    static Wallet initialize(WalletId walletId, AccountId accountId, Money balance, WalletStatus status) {
+    /** Only for infrastructure layer — JPA reconstitution. */
+    public static Wallet initialize(WalletId walletId,
+                                    AccountId accountId,
+                                    Money balance,
+                                    WalletStatus status,
+                                    Long version) {
         Wallet wallet = new Wallet();
         wallet.walletId = walletId;
         wallet.accountId = accountId;
         wallet.balance = balance;
         wallet.status = status;
+        wallet.version = version;
         return wallet;
     }
 
@@ -192,5 +199,9 @@ public class Wallet {
 
     public List<DomainEvent> getDomainEvents() {
         return domainEvents;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 }

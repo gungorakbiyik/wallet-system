@@ -1,5 +1,6 @@
 package com.example.wallet.infrastructure.persistence;
 
+import com.example.wallet.domain.vo.Currency;
 import com.example.wallet.domain.vo.WalletStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -19,8 +20,9 @@ public class WalletJpaEntity {
     private UUID walletId;
     @Column(name = "account_id")
     private UUID accountId;
+    @Enumerated(EnumType.STRING)
     @Column(name = "currency")
-    private String currency;
+    private Currency currency;
     @Column(name = "balance")
     private BigDecimal balance;
     @Enumerated(EnumType.STRING)
